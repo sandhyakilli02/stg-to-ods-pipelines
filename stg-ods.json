@@ -74,6 +74,49 @@
         "select_fields_query": "SELECT customer_id, customer_name, industry, revenue_usd, source_created_date, source_last_modified_date, current_timestamp as effective_start_date, NULL as effective_end_date, TRUE as is_current, current_timestamp as dw_insert_timestamp, current_timestamp as dw_update_timestamp FROM tgt_sink_df_vw",
         "scd_2_update": "UPDATE {0}.customer_account SET effective_end_date = current_timestamp - INTERVAL 1 MILLISECOND, is_current = FALSE, dw_update_timestamp = current_timestamp WHERE customer_id IN (SELECT customer_id FROM tgt_sink_df_vw) AND is_current = TRUE"
     },
+    "life_ie_sys_ods_plcy_new_busns_ie": {
+        "catalog_tbl": "ods_plcy_new_busns_ie",
+        "tgt_tbl_name": "plcy_new_busns_ie",
+        "table_load_type": "0",
+        "sur_key": "plcy_ie_id",
+        "time_src_file_key": "life-ie-sys/stg_ie_daily_file/",
+        "time_src_file_name": "STG_IE_DAILY_FILE.csv",
+        "tgt_tbl_nk": "plcy_num,new_busns_dt",
+        "tgt_cnt_query": "(select count(1) from {0}.PLCY_NEW_BUSNS_IE where load_dt >= current_date and btch_id={1} and crtd_by='{2}') tgt",
+        "cur_table": "(SELECT * FROM {0}.PLCY_NEW_BUSNS_IE where load_dt >= current_date) tgt",
+        "src_fltr_query": "SELECT TRIM(plcy_num) as plcy_num, TRIM(repl_plcy_num) as repl_plcy_num, UPPER(TRIM(plcy_typ_cd)) as plcy_typ_cd, UPPER(TRIM(ie_typ_cd)) as ie_typ_cd, to_date(new_busns_dt,'yyyy-MM-dd') as new_busns_dt, to_date(issue_dt,'yyyy-MM-dd') as issue_dt, CAST(face_amt AS DECIMAL(18,2)) as face_amt, CAST(annlzd_prem AS DECIMAL(18,2)) as annlzd_prem, CAST(term_dur_mths AS INT) as term_dur_mths, COALESCE(UPPER(TRIM(src_sys_cd)),'LIFE_IE') as src_sys_cd FROM src_file_vw WHERE plcy_num IS NOT NULL AND repl_plcy_num IS NOT NULL AND plcy_typ_cd IS NOT NULL AND new_busns_dt IS NOT NULL AND face_amt IS NOT NULL AND annlzd_prem IS NOT NULL",
+        "lkp_query": "select src.plcy_num, src.repl_plcy_num, src.plcy_typ_cd, src.ie_typ_cd, src.new_busns_dt, src.issue_dt, src.face_amt, src.annlzd_prem, src.term_dur_mths, CAST(NULL AS DECIMAL(18,2)) as prod_credit, CAST(NULL AS TIMESTAMP) as prod_credit_calc_dt, src.src_sys_cd, current_timestamp as load_dt, CAST(NULL AS TIMESTAMP) as upd_dt from src_vw src",
+        "rec_after_fltr": "(select lkp.* from lkp_vw lkp left join curr_vw tgt on lkp.plcy_num = tgt.plcy_num AND lkp.new_busns_dt = tgt.new_busns_dt where tgt.plcy_ie_id is null)",
+        "select_fields_query": "SELECT plcy_num, repl_plcy_num, plcy_typ_cd, ie_typ_cd, new_busns_dt, issue_dt, face_amt, annlzd_prem, term_dur_mths, prod_credit, prod_credit_calc_dt, src_sys_cd, cast({0} as decimal(19,0)) as BTCH_ID, load_dt, upd_dt, '{1}' as CRTD_BY, current_timestamp as CRTD_DT FROM tgt_sink_df_vw",
+        "fast_param_update": "UPDATE {0}.PLCY_NEW_BUSNS_IE SET prod_credit = CAST(annlzd_prem AS DECIMAL(18,2)), prod_credit_calc_dt = CURRENT_TIMESTAMP, upd_dt = CURRENT_TIMESTAMP WHERE plcy_typ_cd = 'TERM' AND prod_credit IS NULL AND load_dt >= TRUNC(SYSDATE)"
+    },
+    "life_ie_sys_ods_plcy_trx_sumry": {
+        "catalog_tbl": "ods_plcy_trx_sumry",
+        "tgt_tbl_name": "plcy_trx_sumry",
+        "table_load_type": "0",
+        "sur_key": "trx_sumry_id",
+        "tgt_tbl_nk": "plcy_ie_id",
+        "tgt_cnt_query": "(select count(1) from {0}.PLCY_TRX_SUMRY where load_dt >= current_date and btch_id={1} and crtd_by='{2}') tgt",
+        "cur_table": "(SELECT * FROM {0}.PLCY_TRX_SUMRY where load_dt >= current_date) tgt",
+        "lkp_tables": "1",
+        "table_1": "(SELECT plcy_ie_id, plcy_num, new_busns_dt, prod_credit FROM {0}.PLCY_NEW_BUSNS_IE WHERE load_dt >= current_date) ie",
+        "lkp_query": "select ie.plcy_ie_id, ie.plcy_num, ie.new_busns_dt as trx_dt, 'NEW_BUSNS_IE' as trx_typ_cd, ie.prod_credit, current_timestamp as fusion_load_dt, 'PENDING' as fusion_load_stts_cd, current_timestamp as load_dt, CAST(NULL AS TIMESTAMP) as upd_dt from table_1_vw ie",
+        "rec_after_fltr": "(select lkp.* from lkp_vw lkp left join curr_vw tgt on lkp.plcy_ie_id = tgt.plcy_ie_id where tgt.trx_sumry_id is null)",
+        "select_fields_query": "SELECT plcy_ie_id, plcy_num, trx_dt, trx_typ_cd, prod_credit, fusion_load_dt, fusion_load_stts_cd, cast({0} as decimal(19,0)) as BTCH_ID, load_dt, upd_dt, '{1}' as CRTD_BY, current_timestamp as CRTD_DT FROM tgt_sink_df_vw",
+        "fusion_status_update": "UPDATE {0}.PLCY_TRX_SUMRY SET fusion_load_stts_cd = 'LOADED', upd_dt = CURRENT_TIMESTAMP WHERE fusion_load_stts_cd = 'PENDING' AND load_dt >= TRUNC(SYSDATE)"
+    },
+    "life_ie_sys_ods_fast_param": {
+        "catalog_tbl": "ods_fast_param",
+        "tgt_tbl_name": "fast_param",
+        "table_load_type": "0",
+        "sur_key": "param_id",
+        "tgt_tbl_nk": "param_cd",
+        "tgt_cnt_query": "(select count(1) from {0}.FAST_PARAM where param_cd='PLCY_NEW_BUSNS_IE_PROD_CREDIT' and actv_ind='Y') tgt",
+        "cur_table": "(SELECT * FROM {0}.FAST_PARAM WHERE actv_ind='Y') tgt",
+        "lkp_query": "select 'PLCY_NEW_BUSNS_IE_PROD_CREDIT' as param_cd, 'Production Credit Calculation - Term-to-Term Internal Exchange (PLCY_NEW_BUSNS_IE)' as param_nm, 'UPDATE {0}.PLCY_NEW_BUSNS_IE SET prod_credit = CAST(annlzd_prem AS DECIMAL(18,2)), prod_credit_calc_dt = CURRENT_TIMESTAMP, upd_dt = CURRENT_TIMESTAMP WHERE plcy_typ_cd = ''TERM'' AND prod_credit IS NULL AND load_dt >= TRUNC(SYSDATE)' as qry_txt, 'Y' as actv_ind, current_date as eff_dt, CAST(NULL AS DATE) as exp_dt, 'DATACRAFT_IMPL' as crt_by, current_timestamp as crt_dt, CAST(NULL AS STRING) as upd_by, CAST(NULL AS TIMESTAMP) as upd_dt",
+        "rec_after_fltr": "(select lkp.* from lkp_vw lkp left join curr_vw tgt on lkp.param_cd = tgt.param_cd where tgt.param_id is null)",
+        "select_fields_query": "SELECT param_cd, param_nm, qry_txt, actv_ind, eff_dt, exp_dt, crt_by, crt_dt, upd_by, upd_dt FROM tgt_sink_df_vw"
+    },
     "Global": {
         "Static": {
             "source_system": "ENVISION",
